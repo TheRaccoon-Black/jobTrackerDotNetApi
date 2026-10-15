@@ -1,0 +1,6 @@
+@JobSeekerNet_HostAddress = http://localhost:5010
+
+GET {{JobSeekerNet_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
