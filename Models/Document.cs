@@ -1,5 +1,3 @@
-using Microsoft.Identity.Client;
-
 namespace JobSeekerNet.Models;
 
 public class Document
