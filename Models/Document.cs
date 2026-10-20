@@ -14,6 +14,6 @@ public class Document
     public DateTime? UpdatedAt {get;set;}
 
     //relasi 
-
+    public List<Document> Documents {get; set;} = new();
 
 }

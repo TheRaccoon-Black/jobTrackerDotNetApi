@@ -14,7 +14,7 @@ public class User
 
     //relasi
     public List<Application> Applications { get; set;} = new();
-    public List<ApplicationLog> ApplicationLogs {get; set;} = new();
     public List<Document> Documents {get; set;} = new();
+    public List<ApplicationLog> ApplicationLogs {get; set;} = new();
     
 }

@@ -25,6 +25,19 @@ public class JobSeekerContext(DbContextOptions<JobSeekerContext> options) : DbCo
         .WithMany(a => a.Documents)
         .HasForeignKey(d => d.ApplicationId)
         .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ApplicationLog>()
+        .HasOne(al=>al.User)
+        .WithMany(u => u.ApplicationLogs)
+        .HasForeignKey(K => K.UserId)
+        .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<Document>()
+        .HasOne(y=>y.User)
+        .WithMany(x=>x.Documents)
+        .HasForeignKey(z=>z.UserId)
+        .OnDelete(DeleteBehavior.NoAction);
     }
+
 
 }
