@@ -1,0 +1,30 @@
+# .NET build output
+bin/
+obj/
+*.user
+
+# NuGet
+.nuget/
+packages/
+
+# VS / IDE
+.vs/
+.vscode/
+*.suo
+
+# EF Core local db (SQLite dev, kalau dipakai)
+*.db
+*.sqlite
+
+# Secrets — jangan commit
+appsettings.Development.json
+*.pfx
+secrets/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+storage/logs/
