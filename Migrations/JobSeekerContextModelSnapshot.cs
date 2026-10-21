@@ -49,8 +49,8 @@ namespace JobSeekerNet.Migrations
                     b.Property<string>("JobPostingLink")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("NextFollowUp")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<DateTime?>("NextFollowUp")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Notes")
                         .HasColumnType("nvarchar(max)");

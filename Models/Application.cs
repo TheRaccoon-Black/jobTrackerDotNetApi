@@ -15,7 +15,7 @@ public class Application
     public DateTime? ApplicationDate {get; set;}
     public string? SalaryRange {get;set;}
     public string? Notes {get; set;}
-    public string? NextFollowUp {get; set;}
+    public DateTime? NextFollowUp {get; set;}
     public string? FollowUpNotes {get; set;}
     [Column(TypeName ="nvarchar(max)")]
     public string ? Tags {get; set;}
