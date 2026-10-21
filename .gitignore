@@ -3,6 +3,10 @@ bin/
 obj/
 *.user
 
+
+# Documentation
+docs/
+
 # NuGet
 .nuget/
 packages/
