@@ -4,6 +4,8 @@ using JobSeekerNet.Dtos;
 using JobSeekerNet.Dtos.Applications;
 using JobSeekerNet.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Identity.Client.Extensibility;
+using Microsoft.IdentityModel.Tokens;
 
 namespace JobSeekerNet.Endpoints;
 
@@ -75,6 +77,38 @@ public static class ApplicationEndpoins
 
         });
 
+        group.MapGet("/{id:int}", async(int id, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
+        {
+            var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+
+            var application = await dbContext.Applications.FirstOrDefaultAsync(a=>a.Id == id && a.UserId == userId);
+            if (application == null) return Results.NotFound();
+
+            bool isStale = false;
+
+            if(application.ApplicationDate.HasValue)
+            {
+                var dayIdle = (DateTime.UtcNow - application.ApplicationDate.Value).TotalDays;
+                var earlyStages = new[]{"Wishlist","Applied","Assessment"};
+                var interviewStages = new[]{"HRD Interview", "User Interview"};
+
+                if (earlyStages.Contains(application.Status) && dayIdle > 14) isStale = true;
+                if (interviewStages.Contains(application.Status) && dayIdle > 7) isStale = true;
+            }
+
+            var tagArray = string.IsNullOrEmpty(application.Tags)? new List<string>(): application.Tags.Split(",").ToList();
+            var response = new ApplicationResponseDto(
+                application.Id, application.Company, application.Title,application.Status, application.JobPostingLink,
+                application.Contact, application.ApplicationDate, application.SalaryRange, application.Notes, application.NextFollowUp,
+                application.FollowUpNotes, tagArray, isStale
+            );
+            return Results.Ok(response);
+        });
+
+
+
+
         group.MapGet("/", async (ClaimsPrincipal userClaims, JobSeekerContext dbContext, int page = 1, int pageSize= 10
         ,string? status=null, string? search = null, string? sort = "newest") =>
         {
@@ -130,5 +164,111 @@ public static class ApplicationEndpoins
             return Results.Ok(response);
 
         });
+
+        group.MapPost("/{id:int}", async(int id, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
+        {
+            var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+
+            var application = await dbContext.Applications.FirstOrDefaultAsync(a=>a.Id == id && a.UserId == userId);
+            if (application == null) return Results.NotFound();
+
+            bool isStale = false;
+            if (application.ApplicationDate.HasValue)
+            {
+                var dayIdle = (DateTime.UtcNow - application.ApplicationDate.Value).TotalDays;
+                var earlyStages = new[]{"Wishlist","Applied", "Assesment"};
+                var interviewStages = new[]{"HRD Interview", "User Interview"};
+
+                if (earlyStages.Contains(application.Status) && dayIdle > 14) isStale = true;
+                if (interviewStages.Contains(application.Status) && dayIdle > 7) isStale = true;
+
+            }
+
+            var tagArray = string.IsNullOrEmpty(application.Tags)? new List<string>(): application.Tags.Split(",").ToList();
+
+            var response = new ApplicationResponseDto(
+                application.Id, application.Company, application.Title, application.Status,
+                application.JobPostingLink, application.Contact, application.ApplicationDate, 
+                application.SalaryRange, application.Notes, application.NextFollowUp, application.FollowUpNotes,
+                tagArray, isStale
+            );
+
+            return Results.Ok(response);
+
+        });
+
+        group.MapPut("/{id:int}", async (int id, ApplicationRequestDto dto, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
+        {
+            var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if(!int.TryParse(userIdString,out int userId)) return Results.Unauthorized();
+
+            var application = await dbContext.Applications.FirstOrDefaultAsync(a=> a.UserId == userId && a.Id == id);
+
+            if (application == null) return Results.NotFound();
+            bool isStatusChange = application.Status != dto.Status;
+
+            string? normalizedTags = null;
+            if (!string.IsNullOrWhiteSpace(dto.Tags))
+            {
+                var tagList = dto.Tags.Split(',')
+                .Select(t => t.Trim().ToLower())
+                .Where(t=> !string.IsNullOrEmpty(t))
+                .Distinct();
+                normalizedTags = string.Join(",", tagList);
+            }
+
+            application.Company = dto.Company;
+            application.Title = dto.Company;
+            application.Status = dto.Status;
+            application.JobPostingLink = dto.JobPostingLink;
+            application.Contact = dto.Contact;
+            application.ApplicationDate = dto.ApplicationDate;
+            application.SalaryRange = dto.SalaryRange;
+            application.Notes = dto.Notes;
+            application.NextFollowUp = dto.NextFollowUp;
+            application.FollowUpNotes = dto.FollowUpNotes;
+            application.Tags = normalizedTags;
+            application.UpdatedAt = DateTime.UtcNow;
+
+            if (isStatusChange)
+            {
+                var log = new ApplicationLog
+                {
+                    ApplicationId = application.Id,
+                    UserId = userId,
+                    Event = "status_updated",
+                    NewValue = dto.Status,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                dbContext.ApplicationLogs.Add(log);
+            }
+            await dbContext.SaveChangesAsync();
+
+            return Results.NoContent();
+
+        });
+
+        group.MapDelete("/{id:int}", async(int id, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
+        {
+            var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+
+            var application = await dbContext.Applications.FirstOrDefaultAsync(a=> a.Id == id && a.UserId == userId);;
+            if (application == null) return Results.NotFound();
+
+            var logs = await dbContext.ApplicationLogs.Where(s=>s.ApplicationId == id).ToListAsync();
+
+            dbContext.ApplicationLogs.RemoveRange(logs);
+
+            dbContext.Applications.Remove(application);
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.NoContent();
+        });
+
+
     }
 }
