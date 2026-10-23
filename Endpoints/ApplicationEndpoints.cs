@@ -2,6 +2,7 @@ using System.Security.Claims;
 using JobSeekerNet.Data;
 using JobSeekerNet.Dtos;
 using JobSeekerNet.Dtos.Applications;
+using JobSeekerNet.Dtos.Logs;
 using JobSeekerNet.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Client.Extensibility;
@@ -267,6 +268,24 @@ public static class ApplicationEndpoins
             await dbContext.SaveChangesAsync();
 
             return Results.NoContent();
+        });
+
+        group.MapGet("/{id:int}/logs",async(int id, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
+        {
+           var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+           if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+
+           var applicationExist = dbContext.Applications.AnyAsync(a=>a.Id == id && a.UserId == userId);
+           if (applicationExist == null) return Results.NotFound();
+
+           var logs = await dbContext.ApplicationLogs
+           .Where(l => l.ApplicationId == id)
+           .OrderByDescending(l=>l.CreatedAt)
+           .Select(l=>new ApplicationLogResponseDto(
+            l.Id, l.Event, l.NewValue, l.CreatedAt ?? DateTime.UtcNow
+           )).ToListAsync();
+
+           return Results.Ok(logs);
         });
 
 
