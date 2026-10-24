@@ -5,9 +5,9 @@ public record InterviewResponseDto
     int Id,
     int ApplicationId,
     string Company,
-    string Round,
-    DateTime ScheduleAt,
-    string? Location,
-    string? Notes,
-    string? Result
+    string? InterviewStage,
+    string? Interrviewer,
+    DateTime? ScheduleDate,
+    string? LinkMeeting,
+    string? Notes
 );
