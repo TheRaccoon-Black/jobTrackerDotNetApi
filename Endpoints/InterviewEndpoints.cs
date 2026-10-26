@@ -11,7 +11,7 @@ public static class InterviewEndpoints
 {
     public static void MapInterviewPoints(this WebApplication app)
     {
-        var group = app.MapGroup("/inteviews").RequireAuthorization();
+        var group = app.MapGroup("/api/interviews").RequireAuthorization();
 
        group.MapPost("/", async(InterviewRequestDto dto, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
@@ -115,6 +115,49 @@ public static class InterviewEndpoints
             )).ToListAsync();
 
             return Results.Ok(interviews);
+        });
+
+
+        group.MapPut("/{id:int}", async(int id, InterviewRequestDto dto, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
+        {
+            var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+
+            var interview = await dbContext.Interviews
+                            .Include(i=>i.Application)
+                            .FirstOrDefaultAsync(i=>i.Id == id && i.Application != null && i.Application.UserId ==userId);
+
+            if (interview == null) return Results.NotFound();
+
+            interview.InterviewStage = dto.InterviewStage;
+            interview.Interviewer = dto.Interviewer;
+            interview.ScheduleDate = dto.ScheduleDate;
+            interview.LinkMeeting = dto.LinkMeeting;
+            interview.Notes = dto.Notes;
+            interview.UpdatedAt = DateTime.UtcNow;
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.NoContent();
+
+
+        }
+        );
+
+        group.MapDelete("/{id:int}",async(int id, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
+        {
+           var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+           if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+
+           var interview = await dbContext.Interviews
+                            .Include(i=>i.Application)
+                            .FirstOrDefaultAsync(i=>i.Id == id && i.Application != null && i.Application.UserId == userId);
+            if (interview == null) return Results.NotFound();
+
+            dbContext.Interviews.Remove(interview);
+                await dbContext.SaveChangesAsync();
+                return Results.NoContent();
+
         });
     
     }

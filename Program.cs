@@ -46,6 +46,7 @@ app.UseAuthorization();
 
 app.MapAuthEndpoints();
 app.MapApplicationEndpoints();
+app.MapInterviewPoints();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
