@@ -18,7 +18,7 @@ public static class DashboardEndpoints
 
            var now = DateTime.UtcNow;
            var activeStatuses = new[]{"Wishlist","Applied","Assessment","HR Interview","User Interview"};
-           var earlyStages = new[]{"Wishlist","Appied","Assessment"};
+           var earlyStages = new[]{"Wishlist","Applied","Assessment"};
            var interviewStages = new[]{"HR Interview", "User Interview"};
 
 
