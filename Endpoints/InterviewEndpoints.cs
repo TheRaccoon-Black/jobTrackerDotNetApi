@@ -57,6 +57,7 @@ public static class InterviewEndpoints
                 interview.Id,
                 interview.ApplicationId,
                 application.Company,
+                application.Title,
                 interview.InterviewStage,
                 interview.Interviewer,
                 interview.ScheduleDate,
@@ -82,6 +83,7 @@ public static class InterviewEndpoints
                 i.Id,
                 i.ApplicationId,
                 i.Application != null ? i.Application.Company : string.Empty,
+                i.Application != null ? i.Application.Title : string.Empty,
                 i.InterviewStage,
                 i.Interviewer,
                 i.ScheduleDate,
@@ -107,6 +109,7 @@ public static class InterviewEndpoints
                 i.Id,
                 i.ApplicationId,
                 application.Company,
+                application.Title,
                 i.InterviewStage,
                 i.Interviewer,
                 i.ScheduleDate,
@@ -159,6 +162,63 @@ public static class InterviewEndpoints
                 return Results.NoContent();
 
         });
+
+        group.MapGet("/", async(ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
+        {
+           var userIdContext = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+           if(!int.TryParse(userIdContext, out int userId)) return Results.Unauthorized();
+
+           var now = DateTime.UtcNow;
+
+           var rawInterviews = await dbContext.Interviews.Include(i=>i.Application)
+           .Where(i=>i.Application!.UserId == userId)
+           .Select(i=> new InterviewResponseDto(
+            i.Id, i.ApplicationId, i.Application!.Company,  i.Application.Title,
+            i.InterviewStage,i.Interviewer,i.ScheduleDate,i.LinkMeeting, i.Notes
+           )).ToListAsync();
+
+           var response = new
+           {
+               upcoming = rawInterviews.Where(i=> i.ScheduleDate > now).OrderBy(i=>i.ScheduleDate).ToList(),
+               past = rawInterviews.Where(i=> i.ScheduleDate <= now && i.ScheduleDate != null).OrderByDescending(i=>i.ScheduleDate).ToList(),
+               unscheduled = rawInterviews.Where(i=> !i.ScheduleDate.HasValue).ToList()
+           };
+
+           return Results.Ok(response);
+
+        });
+
+
+        group.MapGet("/calendar", async(int? year, int? month, ClaimsPrincipal userClaims, JobSeekerContext dbContext)=>
+        {
+            var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+
+            var currentYear = year?? DateTime.UtcNow.Year;
+            var currentMonth = month ?? DateTime.UtcNow.Month;
+
+            var startDate = new DateTime(currentYear, currentMonth, 1,0,0,0,DateTimeKind.Utc);
+            var endDate = startDate.AddMonths(1).AddSeconds(-1);
+
+            var interviews = await dbContext.Interviews.Include(i=>i.Application)
+            .Where(i=>i.Application!.UserId == userId && i.ScheduleDate >= startDate && i.ScheduleDate <= endDate).ToListAsync();
+
+            var days = interviews.GroupBy(i=>i.ScheduleDate!.Value.ToString("yyyy-MM-dd"))
+            .ToDictionary(g=>g.Key,
+            g=>g.Select(i=>new InterviewCalendarItemDto(
+                i.Id, i.Application!.Company, i.InterviewStage?? "User Interview",i.ScheduleDate!.Value.ToString("HH:mm")
+            )).ToList());
+
+            return Results.Ok(new
+            {
+                year = currentYear,
+                month = currentMonth,
+                days = days
+            });
+        });
+
+
+
     
     }
 }
