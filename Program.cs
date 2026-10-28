@@ -51,6 +51,7 @@ app.MapApplicationEndpoints();
 app.MapInterviewPoints();
 app.MapDocumentEndpoints();
 app.MapProfileEndpoints();
+app.MapDashboardEndpoints();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
