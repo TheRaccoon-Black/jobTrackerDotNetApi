@@ -283,7 +283,7 @@ public static class ApplicationEndpoins
            .Where(l => l.ApplicationId == id)
            .OrderByDescending(l=>l.CreatedAt)
            .Select(l=>new ApplicationLogResponseDto(
-            l.Id, l.Event, l.NewValue, l.CreatedAt ?? DateTime.UtcNow
+            l.Id, l.Event, l.NewValue ?? string.Empty, l.CreatedAt ?? DateTime.UtcNow
            )).ToListAsync();
 
            return Results.Ok(logs);

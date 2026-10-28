@@ -114,7 +114,7 @@ public static class DocumentEndpoints
             await dbContext.SaveChangesAsync();
 
             return Results.Created($"/api/documents/{document.Id}", new {message = "Document uploaded success."});
-        });
+        }).DisableAntiforgery();
 
         group.MapGet("/{id:int}/download", async(int id, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {

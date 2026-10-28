@@ -35,7 +35,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 });
 
 builder.Services.AddAuthorization();
-
+builder.Services.AddAntiforgery();
 
 
 var app = builder.Build();
@@ -43,11 +43,14 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
+
 
 app.MapAuthEndpoints();
 app.MapApplicationEndpoints();
 app.MapInterviewPoints();
 app.MapDocumentEndpoints();
+app.MapProfileEndpoints();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
