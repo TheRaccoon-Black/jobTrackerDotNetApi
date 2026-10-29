@@ -93,7 +93,7 @@ public static class ApplicationEndpoins
             {
                 var dayIdle = (DateTime.UtcNow - application.ApplicationDate.Value).TotalDays;
                 var earlyStages = new[]{"Wishlist","Applied","Assessment"};
-                var interviewStages = new[]{"HRD Interview", "User Interview"};
+                var interviewStages = new[]{"HR Interview", "User Interview"};
 
                 if (earlyStages.Contains(application.Status) && dayIdle > 14) isStale = true;
                 if (interviewStages.Contains(application.Status) && dayIdle > 7) isStale = true;
@@ -146,7 +146,7 @@ public static class ApplicationEndpoins
                if(a.ApplicationDate.HasValue)
                 {
                     var dayIdle = (DateTime.UtcNow - a.ApplicationDate.Value).TotalDays;
-                    var earlyStages = new[]{"Wishlist", "Applied", "Assesment"};
+                    var earlyStages = new[]{"Wishlist", "Applied", "Assessment"};
                     var interviewStages = new[]{"HR Interview","User Interview"};
 
 
@@ -179,8 +179,8 @@ public static class ApplicationEndpoins
             if (application.ApplicationDate.HasValue)
             {
                 var dayIdle = (DateTime.UtcNow - application.ApplicationDate.Value).TotalDays;
-                var earlyStages = new[]{"Wishlist","Applied", "Assesment"};
-                var interviewStages = new[]{"HRD Interview", "User Interview"};
+                var earlyStages = new[]{"Wishlist","Applied", "Assessment"};
+                var interviewStages = new[]{"HR Interview", "User Interview"};
 
                 if (earlyStages.Contains(application.Status) && dayIdle > 14) isStale = true;
                 if (interviewStages.Contains(application.Status) && dayIdle > 7) isStale = true;
@@ -221,7 +221,7 @@ public static class ApplicationEndpoins
             }
 
             application.Company = dto.Company;
-            application.Title = dto.Company;
+            application.Title = dto.Title;
             application.Status = dto.Status;
             application.JobPostingLink = dto.JobPostingLink;
             application.Contact = dto.Contact;
@@ -276,8 +276,8 @@ public static class ApplicationEndpoins
            var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
            if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
 
-           var applicationExist = dbContext.Applications.AnyAsync(a=>a.Id == id && a.UserId == userId);
-           if (applicationExist == null) return Results.NotFound();
+           var applicationExist = await dbContext.Applications.AnyAsync(a=>a.Id == id && a.UserId == userId);
+           if (!applicationExist) return Results.NotFound();
 
            var logs = await dbContext.ApplicationLogs
            .Where(l => l.ApplicationId == id)

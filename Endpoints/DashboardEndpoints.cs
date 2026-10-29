@@ -29,7 +29,9 @@ public static class DashboardEndpoints
 
            int totalApplications = applications.Count();
 
-           var byStatus = dbContext.Applications.GroupBy(a=>a.Status).ToDictionary(g=>g.Key, g=>g.Count());
+           var byStatus = applications
+           .GroupBy(a => a.Status)
+           .ToDictionary(g => g.Key, g => g.Count());
            int activeCount = applications.Count(a=>activeStatuses.Contains(a.Status));
 
            int staleCount = applications.Count(c =>
