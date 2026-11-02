@@ -52,8 +52,8 @@ public static class ProfileEndpoints
            var emailExist = await dbContext.Users.AnyAsync(u=>u.Email == dto.Email.ToLower() && u.Id != userId);
 
 
-           if( emailExist)
-           return ResponseHelper.Error("Email sudah terdaftar");
+        //    if( emailExist)
+        //    return ResponseHelper.Error("Email sudah terdaftar");
 
            user.Name = dto.Name;
            user.Email = dto.Email.ToLower();

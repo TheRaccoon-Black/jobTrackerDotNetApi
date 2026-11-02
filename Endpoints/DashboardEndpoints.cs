@@ -2,6 +2,7 @@ using System.Security.Claims;
 using JobSeekerNet.Data;
 using JobSeekerNet.Dtos.Dashboards;
 using Microsoft.EntityFrameworkCore;
+using JobSeekerNet.Helpers;
 
 namespace JobSeekerNet.Endpoints;
 
@@ -14,7 +15,8 @@ public static class DashboardEndpoints
         group.MapGet("/", async(ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
            var userIdInt = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-           if (!int.TryParse(userIdInt, out int userId)) return Results.Unauthorized();
+           if (!int.TryParse(userIdInt, out int userId))
+                return ResponseHelper.Error("Unauthorized", 401);
 
            var now = DateTime.UtcNow;
            var activeStatuses = new[]{"Wishlist","Applied","Assessment","HR Interview","User Interview"};
@@ -62,8 +64,7 @@ public static class DashboardEndpoints
             recentApplications
            );
            
-           return Results.Ok(response);
-
+           return ResponseHelper.Success(response, "Data berhasil dimuat di dashbord");
 
         });
     }
