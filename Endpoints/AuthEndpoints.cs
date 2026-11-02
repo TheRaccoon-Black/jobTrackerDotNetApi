@@ -1,6 +1,7 @@
 using JobSeekerNet.Data;
 using JobSeekerNet.Dtos.User;
 using JobSeekerNet.Models;
+using JobSeekerNet.Helpers;
 using Microsoft.EntityFrameworkCore;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -19,7 +20,7 @@ public static class AuthEndpoints
         group.MapPost("/register", async(RegisterRequestDto dto, JobSeekerContext dbContext) =>
         {
            if ( await dbContext.Users.AnyAsync(a => a.Email == dto.Email)){
-                return Results.BadRequest(new {errors = new {email = new[]{"Email sudah digunakan"}}});
+                return ResponseHelper.Error("Email sudah digunakan", 400);
             }
 
             var user = new User
@@ -36,7 +37,7 @@ public static class AuthEndpoints
             await dbContext.SaveChangesAsync();
 
             var response = new UserResponseDto(user.Id, user.Name, user.Email, user.WeeklyTarget);
-            return Results.Created($"/api/auth/me", response);
+            return ResponseHelper.Success(response, "Registrasi berhasil",201);
 
 
         });
@@ -48,14 +49,14 @@ public static class AuthEndpoints
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.Password))
             {
-                return Results.Unauthorized();
+                return ResponseHelper.Error("Unauthorized",401);
             }
             var token = GenerateJwtToken(user, config);
 
 
-            var response = new UserResponseDto(user.Id, user.Name, user.Email, user.WeeklyTarget);
+            var data = new {token, user.Id, user.Name, user.Email, user.WeeklyTarget};
 
-            return Results.Ok(new { token, user = response});
+            return ResponseHelper.Success(data,"Login berhasil", 200);
         });
 
         group.MapPost("/logout", () =>
@@ -66,12 +67,15 @@ public static class AuthEndpoints
         group.MapGet("/me", async(ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
             var UserIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!int.TryParse(UserIdString, out int userId)) return Results.Unauthorized();
+            if (!int.TryParse(UserIdString, out int userId)) 
+                    return ResponseHelper.Error("Unauthorized",401);
 
             var user= await dbContext.Users.FindAsync(userId);
-            if (user == null) return Results.NotFound();
+            if (user == null) 
+                return ResponseHelper.Error("User tidak ditemukan", 404);
+            var data = new UserResponseDto(user.Id, user.Name, user.Email, user.WeeklyTarget);
 
-            return Results.Ok(new UserResponseDto(user.Id, user.Name, user.Email, user.WeeklyTarget));
+            return ResponseHelper.Success(data, "Data user terverifikasi", 200);
 
         }).RequireAuthorization();
 

@@ -1,7 +1,3 @@
-using System;
-using Microsoft.AspNetCore.StaticAssets;
-using Microsoft.EntityFrameworkCore.Metadata.Conventions;
-
 namespace JobSeekerNet.Helpers;
 
 
