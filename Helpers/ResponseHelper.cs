@@ -3,6 +3,8 @@ namespace JobSeekerNet.Helpers;
 
 public record ApiResponse<T>(int Status, string Message, T? Data);
 public record ApiResponse(int status, string Message);
+public record PaginatedMeta(int CurrentPage, int PageSize, int TotalPages, int TotalCount );
+public record PaginatedData<T>(IEnumerable<T> Items, PaginatedMeta Meta);
 
 
 public static class ResponseHelper

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Security.Claims;
 using JobSeekerNet.Data;
 using JobSeekerNet.Dtos;
@@ -6,9 +5,8 @@ using JobSeekerNet.Dtos.Applications;
 using JobSeekerNet.Dtos.Logs;
 using JobSeekerNet.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Identity.Client.Extensibility;
-using Microsoft.IdentityModel.Tokens;
-
+using JobSeekerNet.Helpers;
+using Azure;
 namespace JobSeekerNet.Endpoints;
 
 public static class ApplicationEndpoins
@@ -20,7 +18,7 @@ public static class ApplicationEndpoins
         group.MapPost("/", async(ApplicationRequestDto dto, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
             var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+            if (!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unauthorized",401);
 
             string? normalizedtags = null;
             if (!string.IsNullOrWhiteSpace(dto.Tags))
@@ -75,17 +73,17 @@ public static class ApplicationEndpoins
                 application.ApplicationDate, application.SalaryRange, application.Notes, application.NextFollowUp, application.FollowUpNotes,
                 tagArray, false
             );
-            return Results.Created($"/api/applications/{application.Id}", response);
+            return ResponseHelper.Success(response,$"/api/applications/{application.Id}", 201);
 
         });
 
         group.MapGet("/{id:int}", async(int id, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
             var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+            if (!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unathorized",401);
 
             var application = await dbContext.Applications.FirstOrDefaultAsync(a=>a.Id == id && a.UserId == userId);
-            if (application == null) return Results.NotFound();
+            if (application == null) return ResponseHelper.Error("Not found", 404);
 
             bool isStale = false;
 
@@ -105,7 +103,7 @@ public static class ApplicationEndpoins
                 application.Contact, application.ApplicationDate, application.SalaryRange, application.Notes, application.NextFollowUp,
                 application.FollowUpNotes, tagArray, isStale
             );
-            return Results.Ok(response);
+            return ResponseHelper.Success(response,"Berhasil di buat");
         });
 
 
@@ -115,7 +113,7 @@ public static class ApplicationEndpoins
         ,string? status=null, string? search = null, string? sort = "newest") =>
         {
             var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+            if(!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unauthorized", 401);
 
             var query = dbContext.Applications.Where(a=>a.UserId == userId).AsQueryable();
 
@@ -163,17 +161,18 @@ public static class ApplicationEndpoins
             });
 
             var response = new PagedResponseDto<ApplicationResponseDto>(page,pageSize,totalPages, totalItems,items);
-            return Results.Ok(response);
+            // return Results.Ok(response);
+            return ResponseHelper.Success(response);
 
         });
 
         group.MapPost("/{id:int}", async(int id, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
             var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+            if (!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unauthorized", 401);
 
             var application = await dbContext.Applications.FirstOrDefaultAsync(a=>a.Id == id && a.UserId == userId);
-            if (application == null) return Results.NotFound();
+            if (application == null) return ResponseHelper.Error("Not Found", 404);
 
             bool isStale = false;
             if (application.ApplicationDate.HasValue)
@@ -196,18 +195,18 @@ public static class ApplicationEndpoins
                 tagArray, isStale
             );
 
-            return Results.Ok(response);
+            return ResponseHelper.Success(response);
 
         });
 
         group.MapPut("/{id:int}", async (int id, ApplicationRequestDto dto, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
             var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if(!int.TryParse(userIdString,out int userId)) return Results.Unauthorized();
+            if(!int.TryParse(userIdString,out int userId)) return ResponseHelper.Error("Unauthorized",401);
 
             var application = await dbContext.Applications.FirstOrDefaultAsync(a=> a.UserId == userId && a.Id == id);
 
-            if (application == null) return Results.NotFound();
+            if (application == null) return ResponseHelper.Error("Not Found");
             bool isStatusChange = application.Status != dto.Status;
 
             string? normalizedTags = null;
@@ -248,17 +247,17 @@ public static class ApplicationEndpoins
             }
             await dbContext.SaveChangesAsync();
 
-            return Results.NoContent();
+            return ResponseHelper.SuccessWithoutData("Data berhasil diubah");
 
         });
 
         group.MapDelete("/{id:int}", async(int id, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
             var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+            if (!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unauthorized", 401);
 
             var application = await dbContext.Applications.FirstOrDefaultAsync(a=> a.Id == id && a.UserId == userId);;
-            if (application == null) return Results.NotFound();
+            if (application == null) return ResponseHelper.Error("Not found", 404);
 
             var logs = await dbContext.ApplicationLogs.Where(s=>s.ApplicationId == id).ToListAsync();
 
@@ -268,16 +267,16 @@ public static class ApplicationEndpoins
 
             await dbContext.SaveChangesAsync();
 
-            return Results.NoContent();
+            return ResponseHelper.SuccessWithoutData("Data berhasil dihapus");
         });
 
         group.MapGet("/{id:int}/logs",async(int id, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
            var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-           if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+           if(!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unauthorized", 401);
 
            var applicationExist = await dbContext.Applications.AnyAsync(a=>a.Id == id && a.UserId == userId);
-           if (!applicationExist) return Results.NotFound();
+           if (!applicationExist) return ResponseHelper.Error("Not found",404);
 
            var logs = await dbContext.ApplicationLogs
            .Where(l => l.ApplicationId == id)
@@ -286,13 +285,13 @@ public static class ApplicationEndpoins
             l.Id, l.Event, l.NewValue ?? string.Empty, l.CreatedAt ?? DateTime.UtcNow
            )).ToListAsync();
 
-           return Results.Ok(logs);
+           return ResponseHelper.Success(logs,"Success", 201);
         });
 
         group.MapGet("/tags",async(ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
             var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+            if (!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unathorized",401);
 
             var tagLists = await dbContext.Applications
             .Where(i=>i.UserId == userId && !string.IsNullOrEmpty(i.Tags))
@@ -307,7 +306,9 @@ public static class ApplicationEndpoins
             .OrderBy(t=>t)
             .ToList();
 
-            return Results.Ok(new {tags = uniqueTags});
+            var data = new { tags = uniqueTags};
+
+            return ResponseHelper.Success(data);
 
         });
 
@@ -316,10 +317,10 @@ public static class ApplicationEndpoins
         group.MapPost("/{id:int}/status", async(int id, ClaimsPrincipal userClaims, JobSeekerContext dbContext, StatusUpdateRequestDto dto) =>
         {
            var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-           if (!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+           if (!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unauthorized", 401);
 
            var app = await dbContext.Applications.FirstOrDefaultAsync(i => i.Id == id && i.UserId == userId);
-           if(app == null) return Results.NotFound();
+           if(app == null) return ResponseHelper.Error("Not found", 401);
 
            if (app.Status != dto.Status)
             {
@@ -340,16 +341,16 @@ public static class ApplicationEndpoins
                 await dbContext.SaveChangesAsync();
 
             }
-            return Results.NoContent();
+            return ResponseHelper.SuccessWithoutData("Data berhasil di buat");
         });
 
         group.MapPost("/{id:int}/follow-up", async(int id, FollowUpRequestDto dto, ClaimsPrincipal userClaims, JobSeekerContext dbContext)=>
         {
             var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+            if(!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unauthorized",401);
 
             var application = await dbContext.Applications.FirstOrDefaultAsync(i=>i.Id == id && i.UserId == userId);
-            if (application == null) return Results.NotFound();
+            if (application == null) return ResponseHelper.Error("Not found", 404);
 
             bool isDateChanged = application.NextFollowUp != dto.NextFollowUp;
 
@@ -370,23 +371,24 @@ public static class ApplicationEndpoins
                 });
             }
             await dbContext.SaveChangesAsync();
-            return Results.NoContent();
+            return ResponseHelper.SuccessWithoutData("Data berhasil dibuat", 201);
 
         });
 
         group.MapPost("/bulk", async(BulkActionRequestDto dto, ClaimsPrincipal userClaims, JobSeekerContext dbContex) =>
         {
             var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+            if(!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unauthorized", 401);
 
             if (dto.Ids == null || !dto.Ids.Any())
-                return Results.BadRequest(new {errors = new {ids = new[]{"Ids cannot be empty."}}});
+                // return Results.BadRequest(new {errors = new {ids = new[]{"Ids cannot be empty."}}});
+                return ResponseHelper.Error("Ids cannot be empthy");
             var appToUpdate = await dbContex.Applications
             .Where(i=>i.UserId == userId && dto.Ids.Contains(i.Id))
             .ToListAsync();
 
             if (!appToUpdate.Any()) 
-                return Results.Ok(new {affected = 0, message = "No valid applications found.."});
+                return ResponseHelper.Error("no data affected, data lamaran tidak valid");
             
             int affectedCount = appToUpdate.Count();
 
@@ -394,11 +396,13 @@ public static class ApplicationEndpoins
             {
                 dbContex.Applications.RemoveRange(appToUpdate);
                 await dbContex.SaveChangesAsync();
-                return Results.Ok(new {affected = affectedCount, message = $"Deleted {affectedCount} application(s)."});
+                var aff = new {affected = affectedCount};
+                return ResponseHelper.Success(aff,$"Deleted {affectedCount} application(s).");
+                // return Results.Ok(new {affected = affectedCount, message = $"Deleted {affectedCount} application(s)."});
             }else if(dto.Action == "set_status")
             {
                 if (string.IsNullOrWhiteSpace(dto.Status))
-                    return Results.BadRequest(new { errors = new {status = new[]{"Status is requiered."}}});
+                    return ResponseHelper.Error("Status is requiered.");
 
                 foreach (var app in appToUpdate)
                 {
@@ -420,17 +424,20 @@ public static class ApplicationEndpoins
                     }
                 }
                 await dbContex.SaveChangesAsync();
-                return Results.Ok(new{affected = affectedCount, message = $"Status of {affectedCount} application(s) updated to {dto.Status}."});
+                var affRes = new {affected = affectedCount};
+                return ResponseHelper.Success(affRes, $"Status of {affectedCount} application(s) updated to {dto.Status}.");
+                // return Results.Ok(new{affected = affectedCount, message = $"Status of {affectedCount} application(s) updated to {dto.Status}."});
 
             }
-            return Results.BadRequest(new{errors = new {action = new []{"Invalid action"}}});
+            // return Results.BadRequest(new{errors = new {action = new []{"Invalid action"}}});
+            return ResponseHelper.Error("Invalid action");
 
         });
 
         group.MapGet("/export",async(ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
             var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+            if (!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unauthorized",401);
 
 
             var application =  await dbContext.Applications
@@ -472,12 +479,12 @@ public static class ApplicationEndpoins
         group.MapGet("/{id:int}/draft-follow-up",async(int id, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
            var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-           if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+           if(!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unauthorized", 401);
 
            var userName = userClaims.FindFirst(ClaimTypes.Name)?.Value ?? "applicant";
 
            var app = await dbContext.Applications.FirstOrDefaultAsync(i=>i.Id == id && i.UserId == userId);
-           if (app == null) return Results.NotFound();
+           if (app == null) return ResponseHelper.Error("Not found", 404);
 
            var to = !string.IsNullOrWhiteSpace(app.Contact) ?app.Contact : "Hiring Team";
            var subject = $"Following up : {app.Title} application at {app.Company}";
@@ -502,13 +509,8 @@ public static class ApplicationEndpoins
                        $"Thank you for your time.\n\n" +
                        $"Best regards,\n{userName}";
             }
-
-            return Results.Ok(new
-            {
-                to = to,
-                subject = subject,
-                body = body
-            });
+            var response = new { to = to, subject = subject, body = body};
+            return ResponseHelper.Success(response);
         });
     }
 }
