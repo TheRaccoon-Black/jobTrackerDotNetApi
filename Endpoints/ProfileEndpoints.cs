@@ -1,12 +1,14 @@
-using System;
-using System.Diagnostics;
 using System.Security.Claims;
-using System.Xml.Serialization;
 using JobSeekerNet.Data;
 using JobSeekerNet.Dtos.Profiles;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.VisualBasic;
+using JobSeekerNet.Helpers;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Azure;
+using Microsoft.EntityFrameworkCore.Query.Internal;
+
+
 
 namespace JobSeekerNet.Endpoints;
 
@@ -19,35 +21,39 @@ public static class ProfileEndpoints
         group.MapGet("/", async(ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
            var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-           if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+           if(!int.TryParse(userIdString, out int userId)) 
+                return ResponseHelper.Error("Unauthorized", 401);
 
            var user = await dbContext.Users.FindAsync(userId);
-           if (user == null) return Results.NotFound();
+           if (user == null) 
+                return ResponseHelper.Error("Not Found", 404);
 
-
-           return Results.Ok(new
-           {
-               id = user.Id,
-               name = user.Name,
-               email = user.Email,
-               weeklyTarget = user.WeeklyTarget
-           });
+            var profileData = new
+            {
+                id = userId,
+                name = user.Name,
+                email = user.Email,
+                weeklyTarget = user.WeeklyTarget
+            };
+            return ResponseHelper.Success(profileData, "Profile berhasil dimuat");
 
         });
 
         group.MapPatch("/", async([FromBody] ProfileUpdateRequestDto dto, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
            var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-           if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+           if(!int.TryParse(userIdString, out int userId)) 
+                return ResponseHelper.Error("Unauthorized", 401);
 
            var user = await dbContext.Users.FindAsync(userId);
-           if(user == null) return Results.NotFound();
+           if(user == null) 
+                return ResponseHelper.Error("User tidak ditemukan");
 
            var emailExist = await dbContext.Users.AnyAsync(u=>u.Email == dto.Email.ToLower() && u.Id != userId);
 
 
            if( emailExist)
-           return Results.BadRequest(new {errors = new {email = new[]{"Email is already taken"}}});
+           return ResponseHelper.Error("Email sudah terdaftar");
 
            user.Name = dto.Name;
            user.Email = dto.Email.ToLower();
@@ -56,21 +62,22 @@ public static class ProfileEndpoints
            user.UpdatedAt = DateTime.UtcNow;
            await dbContext.SaveChangesAsync();
 
-           return Results.NoContent();
+           return ResponseHelper.SuccessWithoutData("Profil berhasil di perbaharui");
         });
 
         group.MapDelete("/", async([FromBody] ProfileDeleteRequestDto dto, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
            var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-           if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+           if(!int.TryParse(userIdString, out int userId)) 
+                return ResponseHelper.Error("unauthorized", 401);
 
            var user = await dbContext.Users.FindAsync(userId);
-           if(user == null) return Results.NotFound();
+           if(user == null) return ResponseHelper.Error("Not Found", 404);
 
            bool isPasswordValid = BCrypt.Net.BCrypt.Verify(dto.Password, user.Password);
 
            if(!isPasswordValid)
-                return Results.BadRequest(new {errors = new {password = new[]{"Invalid password."}}});
+                return ResponseHelper.Error("Password yang dimasukkan salah");
 
             var documents = await dbContext.Documents.Where(d => d.UserId == userId).ToListAsync();
 
@@ -86,7 +93,7 @@ public static class ProfileEndpoints
             dbContext.Users.Remove(user);
             await dbContext.SaveChangesAsync();
 
-            return Results.NoContent();
+            return ResponseHelper.SuccessWithoutData("Akun berhasil dihapus");
         });
     }
 }
