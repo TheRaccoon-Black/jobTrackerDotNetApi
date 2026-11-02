@@ -2,8 +2,9 @@ using System.Security.Claims;
 using JobSeekerNet.Data;
 using JobSeekerNet.Dtos.Interviews;
 using JobSeekerNet.Models;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using JobSeekerNet.Helpers;
+using Azure;
 
 namespace JobSeekerNet.Endpoints;
 
@@ -16,10 +17,10 @@ public static class InterviewEndpoints
        group.MapPost("/", async(InterviewRequestDto dto, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
             var UserIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!int.TryParse(UserIdString, out int userId)) return Results.Unauthorized();
+            if (!int.TryParse(UserIdString, out int userId)) return ResponseHelper.Error("Unauthorized", 401);
 
             var application = await dbContext.Applications.FirstOrDefaultAsync(a=>a.Id == dto.ApplicationId && a.UserId == userId);
-            if (application == null) return Results.NotFound();
+            if (application == null) return ResponseHelper.Error("Not found", 404);
 
             var interview = new Interview
             {
@@ -64,12 +65,13 @@ public static class InterviewEndpoints
                 interview.LinkMeeting,
                 interview.Notes
             );
-            return Results.Created($"/api/interviews/{interview.Id}",response);
+            // return Results.Created($"/api/interviews/{interview.Id}",response);
+            return ResponseHelper.Success(response, "data berhasil dibuat", 201);
         });
         group.MapGet("/upcoming", async(ClaimsPrincipal userClaims, JobSeekerContext dbContext)=>
         {
             var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+            if (!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unathorized", 401);
 
             var now = DateTime.UtcNow;
 
@@ -91,16 +93,16 @@ public static class InterviewEndpoints
                 i.Notes
             )).ToListAsync();
 
-            return Results.Ok(upComingList);
+            return ResponseHelper.Success(upComingList);
         });
 
         group.MapGet("/application/{applicationId:int}",async(int applicationId, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
             var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+            if(!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unauthorized",401);
 
             var application = await dbContext.Applications.FirstOrDefaultAsync(i=>i.Id == applicationId && i.UserId == userId);
-            if (application == null) return Results.NotFound();
+            if (application == null) return ResponseHelper.Error("Not found", 404);
 
             var interviews = await dbContext.Interviews
             .Where(i=>i.ApplicationId == applicationId)
@@ -117,20 +119,20 @@ public static class InterviewEndpoints
                 i.Notes
             )).ToListAsync();
 
-            return Results.Ok(interviews);
+            return ResponseHelper.Success(interviews);
         });
 
 
         group.MapPut("/{id:int}", async(int id, InterviewRequestDto dto, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
             var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+            if(!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unauthorized", 401);
 
             var interview = await dbContext.Interviews
                             .Include(i=>i.Application)
                             .FirstOrDefaultAsync(i=>i.Id == id && i.Application != null && i.Application.UserId ==userId);
 
-            if (interview == null) return Results.NotFound();
+            if (interview == null) return ResponseHelper.Error("Not found", 404);
 
             interview.InterviewStage = dto.InterviewStage;
             interview.Interviewer = dto.Interviewer;
@@ -141,7 +143,7 @@ public static class InterviewEndpoints
 
             await dbContext.SaveChangesAsync();
 
-            return Results.NoContent();
+            return ResponseHelper.SuccessWithoutData("Data berhasil di edit");
 
 
         }
@@ -150,23 +152,23 @@ public static class InterviewEndpoints
         group.MapDelete("/{id:int}",async(int id, ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
            var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-           if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+           if(!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unauthorized",401);
 
            var interview = await dbContext.Interviews
                             .Include(i=>i.Application)
                             .FirstOrDefaultAsync(i=>i.Id == id && i.Application != null && i.Application.UserId == userId);
-            if (interview == null) return Results.NotFound();
+            if (interview == null) return ResponseHelper.Error("Not found", 404);
 
             dbContext.Interviews.Remove(interview);
                 await dbContext.SaveChangesAsync();
-                return Results.NoContent();
+                return ResponseHelper.SuccessWithoutData("Data berhasil dihapus");
 
         });
 
         group.MapGet("/", async(ClaimsPrincipal userClaims, JobSeekerContext dbContext) =>
         {
            var userIdContext = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-           if(!int.TryParse(userIdContext, out int userId)) return Results.Unauthorized();
+           if(!int.TryParse(userIdContext, out int userId)) return ResponseHelper.Error("Unauthorized", 401);
 
            var now = DateTime.UtcNow;
 
@@ -184,7 +186,7 @@ public static class InterviewEndpoints
                unscheduled = rawInterviews.Where(i=> !i.ScheduleDate.HasValue).ToList()
            };
 
-           return Results.Ok(response);
+           return ResponseHelper.Success(response);
 
         });
 
@@ -192,7 +194,7 @@ public static class InterviewEndpoints
         group.MapGet("/calendar", async(int? year, int? month, ClaimsPrincipal userClaims, JobSeekerContext dbContext)=>
         {
             var userIdString = userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if(!int.TryParse(userIdString, out int userId)) return Results.Unauthorized();
+            if(!int.TryParse(userIdString, out int userId)) return ResponseHelper.Error("Unauthorized", 401);
 
             var currentYear = year?? DateTime.UtcNow.Year;
             var currentMonth = month ?? DateTime.UtcNow.Month;
@@ -209,12 +211,9 @@ public static class InterviewEndpoints
                 i.Id, i.Application!.Company, i.InterviewStage?? "User Interview",i.ScheduleDate!.Value.ToString("HH:mm")
             )).ToList());
 
-            return Results.Ok(new
-            {
-                year = currentYear,
-                month = currentMonth,
-                days = days
-            });
+            var response = new {year = currentYear, month = currentMonth, days = days};
+
+            return ResponseHelper.Success(response);
         });
 
 
