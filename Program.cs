@@ -51,6 +51,7 @@ var app = builder.Build();
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
+app.UseCors("AllowAngular");
 app.UseAuthorization();
 app.UseAntiforgery();
 
